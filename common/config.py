@@ -5,8 +5,10 @@ import os
 class Config:
     def __init__(self):
         with open('config.yml', encoding='utf8') as f:
-            # safe_load can return None if file is empty or invalid
-            self.c = safe_load(f) or {}
+            # safe_load can return None if the file is empty / comments only
+            data = safe_load(f)
+            # ensure we always have a dict
+            self.c = data or {}
 
         self.log_level = self.c.get('log_level', 'INFO')
 
@@ -35,7 +37,14 @@ class Config:
         3. default
         """
         env_key = f"{section}_{key}".upper()
+
+        # 1) Environment variable
         if env_key in os.environ:
             return os.environ[env_key]
 
-        return self.c.get(section, {}).get(key, default)
+        # 2) YAML (guard against self.c being None)
+        cfg = self.c or {}
+        section_dict = cfg.get(section) or {}
+
+        # 3) default if not found
+        return section_dict.get(key, default)
