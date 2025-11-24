@@ -1,11 +1,14 @@
 from yaml import safe_load
 import os
 
+
 class Config:
     def __init__(self):
-        self.c = safe_load(open('config.yml', encoding='utf8'))
+        with open('config.yml', encoding='utf8') as f:
+            # safe_load can return None if file is empty or invalid
+            self.c = safe_load(f) or {}
 
-        self.log_level = os.environ.get("LOG_LEVEL", self.c.get('log_level', 'INFO'))
+        self.log_level = self.c.get('log_level', 'INFO')
 
         self.miniflux_base_url = self.get_config_value('miniflux', 'base_url', None)
         self.miniflux_api_key = self.get_config_value('miniflux', 'api_key', None)
@@ -25,9 +28,13 @@ class Config:
         self.agents = self.c.get('agents', {})
 
     def get_config_value(self, section, key, default=None):
-        # Environment variable name pattern: SECTION_KEY → uppercase
+        """
+        Priority:
+        1. ENV: SECTION_KEY (uppercased)
+        2. YAML: c[section][key]
+        3. default
+        """
         env_key = f"{section}_{key}".upper()
-
         if env_key in os.environ:
             return os.environ[env_key]
 
