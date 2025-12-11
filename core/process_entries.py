@@ -33,18 +33,29 @@ def process_entry(miniflux_client, entry):
                     {"role": "user", "content": "The following is the input content:\n---\n " + md(entry['content'])}
                 ]
 
-            completion = llm_client.chat.completions.create(
-                model=config.llm_model,
-                messages= messages,
-                timeout=config.llm_timeout
-            )
+            try:
+                completion = llm_client.chat.completions.create(
+                    model=config.llm_model,
+                    messages= messages,
+                    timeout=config.llm_timeout
+                )
 
-            response_content = completion.choices[0].message.content
-            logger.info(f"agents:{agent[0]} feed_title:{entry['title']} result:{response_content}")
+                response_content = completion.choices[0].message.content
+            except Exception as e:
+                logger.error(f"Error processing entry {entry['id']} with agent {agent[0]}: {e}")
+                continue
+            log_content = (response_content or "")[:20] + '...' if len(response_content) > 20 else response_content
+            logger.info(f"agents:{agent[0]} feed_id:{entry['id']} result:{log_content}")
 
             # save for ai_summary
             if agent[0] == 'summary':
-                entry_list = {'datetime': entry['created_at'], 'category': entry['feed']['category']['title'], 'title': entry['title'], 'content': response_content}
+                entry_list = {
+                    'datetime': entry['created_at'],
+                    'category': entry['feed']['category']['title'],
+                    'title': entry['title'],
+                    'content': response_content,
+                    'url': entry['url']
+                }
                 with file_lock:
                     try:
                         with open('entries.json', 'r') as file:
